@@ -2,10 +2,13 @@
 Commonly used OIDS module
 """
 
+from common import config
+from common import util
+
 __author__ = "Jason Butler"
 __version__ = "0.1a"
 
-def oid_by_name(name=None):
+def oid_by_name(name=None, oids_yml_file=config.cfg.oids_yml_file):
     """Given an OID name, return the OID string and the oids_dict in a tuple.
 
     Parameter:: name
@@ -17,13 +20,8 @@ def oid_by_name(name=None):
     in oids_dict.
     """
 
-    oids_dict = {
-        'ifDescr': '1.3.6.1.2.1.2.2.1.2',
-        'ifInOctets': '1.3.6.1.2.1.2.2.1.10.5',
-        'ifInUcastPkts': '1.3.6.1.2.1.2.2.1.11.5',
-        'ifOutOctets': '1.3.6.1.2.1.2.2.1.16.5',
-        'ifOutUcastPkts': '1.3.6.1.2.1.2.2.1.17.5',
-    }
+    oids_dict = util.load_yaml_from_file(oids_yml_file)
+
     return_val = (oids_dict.get(name), oids_dict)
     if return_val[0] == None:
         print "Error: Parameter value of parameter 'name' did not match a key in oids_dict.  'name' = ", name
