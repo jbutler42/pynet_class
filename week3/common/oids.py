@@ -20,11 +20,13 @@ def oid_by_name(name=None, oids_yml_file=config.cfg.oids_yml_file):
     in oids_dict.
     """
 
-    oids_dict = util.load_yaml_from_file(oids_yml_file)
+    oids_dict = util.read_data_file(oids_yml_file)
 
-    return_val = (oids_dict.get(name), oids_dict)
+    return_val = oids_dict.get(name)
     if return_val[0] == None:
         print "Error: Parameter value of parameter 'name' did not match a key in oids_dict.  'name' = ", name
         print "  Valid keys in oids_dict:"
         print "  ", oids_dict.keys()
     return return_val
+
+get = oid_by_name
