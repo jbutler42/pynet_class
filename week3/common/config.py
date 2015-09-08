@@ -13,6 +13,8 @@ class configObject(object):
         self.entities_yml_file = self.cfg.get('Files', 'entities_yml_file')
         self.oids_yml_file = self.cfg.get('Files', 'oids_yml_file')
         self.data_file_folder = self.cfg.get('Files', 'data_file_folder')
+        self.reload_max_last_changed = float(self.cfg.get('Device Settings', 'reload_max_last_changed'))
+        self.loop_pause_seconds = float(self.cfg.get('Runtime Options', 'loop_pause_seconds'))
 
 
 cfg = configObject()

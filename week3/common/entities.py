@@ -10,7 +10,6 @@ class entityObject(object):
         self.entities = util.read_data_file(self.entities_yml_file)
         self.users = util.myDict(self.getUsers())
         self.devices = util.myDict(self.getDevices())
-        print self.users.user1
 
     def getUsers(self):
         return self.entities.snmpv3_users

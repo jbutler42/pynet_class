@@ -8,6 +8,8 @@ from common.Kirk import email_helper
 from common.Kirk import snmp_helper
 
 class myDict(dict):
+    def __init__(self, *args, **kwargs):
+        super(myDict, self).__init__(*args, **kwargs)
     def __getattr__(self, name):
         return self.get(name)
     def __setattr__(self, name, value):
@@ -19,13 +21,15 @@ class myDict(dict):
         return self.__dict__
     def __setstate__(self, d):
         self.__dict__.update(d)
+    def __repr__(self):
+        return str(dict(self))
 
 
 def cisco_tics_to_ctime(epoch, uptime, r_c_tics, r_s_tics, s_c_tics):
-    total_uptime_seconds = uptime / 100
-    running_changed_seconds = r_c_tics / 100
-    running_saved_seconds = r_s_tics / 100
-    startup_changed_seconds = s_c_tics / 100
+    total_uptime_seconds = float(uptime) / 100
+    running_changed_seconds = float(r_c_tics) / 100
+    running_saved_seconds = float(r_s_tics) / 100
+    startup_changed_seconds = float(s_c_tics) / 100
 
     uptime_minutes, uptime_seconds = divmod(total_uptime_seconds, 60)
     uptime_hours, uptime_minutes = divmod(uptime_minutes, 60)
@@ -34,7 +38,7 @@ def cisco_tics_to_ctime(epoch, uptime, r_c_tics, r_s_tics, s_c_tics):
     uptime_years, uptime_weeks = divmod(uptime_weeks, 52)
 
     c_uptime = (
-        "%d years, %d weeks, %d days, %d hours, %d minutes, %d seconds" % (
+        "Y:%d W:%d D:%d H:%d M:%d S:%d" % (
             int(uptime_years),
             int(uptime_weeks),
             int(uptime_days),
@@ -43,17 +47,22 @@ def cisco_tics_to_ctime(epoch, uptime, r_c_tics, r_s_tics, s_c_tics):
             int(uptime_seconds)
         )
     )
-    c_boot_time = time.ctime(epoch - total_uptime_seconds)
-    c_r_c_time = time.ctime(epoch - running_changed_seconds)
-    c_r_s_time = time.ctime(epoch - running_saved_seconds)
-    c_s_c_time = time.ctime(epoch - startup_changed_seconds)
-    return {
+    epoch = float(epoch)
+    scan_time = time.ctime(epoch)
+    tus = total_uptime_seconds
+    c_boot_time = time.ctime(epoch - tus)
+    c_r_c_time = time.ctime(epoch - (tus - running_changed_seconds))
+    c_r_s_time = time.ctime(epoch - (tus - running_saved_seconds))
+    c_s_c_time = time.ctime(epoch - (tus - startup_changed_seconds))
+    time_status_dict = {
         'boot_time': c_boot_time,
         'up_time': c_uptime,
         'running_changed_time': c_r_c_time,
         'running_saved_time': c_r_s_time,
         'startup_changed_time': c_s_c_time,
+        'scan_time': scan_time,
     }
+    return time_status_dict
 
     
 def get_snmp_data(device_tuple, user_tuple, oid_string):
@@ -97,27 +106,24 @@ def file_type_from_ext(file_name):
 def write_data_file(file_name, data_dict):
     assert(type(file_name) == type(str()))
     assert(type(data_dict) in [type(dict()), type(myDict())])
-    print "WRITE DEBUG:", data_dict
-    print "WRITE DEBUG:", file_name
-    print "WRITE DEBUG:", os.path.abspath(os.curdir)
    
     data_format = file_type_from_ext(file_name)
     try:
         if data_format == "YAML":
             fp = open(file_name, "w+")
-            yaml.dump(data_dict, fp, default_flow_style=False)
+            y_dict = dict(data_dict)
+            yaml.safe_dump(y_dict, fp, default_flow_style=False)
         elif data_format == "JSON":
             fp = open(file_name, "w+")
             json.dump(data_dict, fp)
         elif data_format == "PICKLE":
             fp = open(file_name, "wb+")
-            print "DEBUG: Writing a pickle file!!"
             pickle.dump(data_dict, fp)
     except Exception as e:
         print "ERROR: Could not open file for writing:", file_name, e
         raise
     else:
-        fp.close() 
+        fp.close()
 
 
 def read_data_file(file_name):

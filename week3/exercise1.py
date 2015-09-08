@@ -8,6 +8,7 @@ from common.util import get_snmp_data
 from common.util import myDict
 from common.util import read_data_file
 from common.util import write_data_file
+import os
 import time
 
 
@@ -42,16 +43,24 @@ def is_equal_dicts(data_dict):
         return False
 
 
+def get_max_length(list_of_lists):
+    max_length = 0
+    for this_list in list_of_lists:
+        this_max_length = max([len(x) for x in this_list])
+        max_length = max(max_length, this_max_length)
+    return max_length 
+
+
 def my_get_snmp_data(device_tuple, user_tuple, oids_dict):
     snmp_data_dict = myDict()
-    snmp_data_dict['epoch'] = time.time()
+    snmp_data_dict['epoch'] = str(time.time())
     for oid_alias, oid_string in oids_dict.items():
         snmp_data_dict[oid_alias] = get_snmp_data(
             tuple(device_tuple),
             tuple(user_tuple),
             oid_string
         )
-    return snmp_data_dict
+    return dict(snmp_data_dict)
 
 
 def get_file_data(file_name):
@@ -86,9 +95,11 @@ def main(args):
     if is_equal_dicts(saved_data):
         if saved_data[file_name] != None:
             saved_devices = saved_data[file_name]
-        print "DEBUG:", saved_devices
     else:
-        print "ERROR: Data in data files differs!", args.data_files
+        print "ERROR: Data in data files differs! Deleting data files.", args.data_files
+        for file_name in args.data_files:
+            if os.path.exists(file_name):
+                os.remove(file_name)
         raise BaseException
         
     # get snmp data from each device for each oid
@@ -100,67 +111,181 @@ def main(args):
             args.oids_dict
         )
 
-        print dev_name, snmp_data[dev_name]
 
     # compare SNMP data with saved data
-    changed_devices_list = []
+    devices_list = []
     for dev_name in list([x for x in snmp_data if x in saved_devices]):
+        print (
+            dev_name,
+            time.ctime(time.time())
+        )
         saved = saved_devices[dev_name]
         snmp = snmp_data[dev_name]
-        epoch = snmp.epoch
-        uptime = snmp.uptime
-        running_changed = snmp.running_last_changed
-        running_saved = snmp.running_last_saved
-        startup_changed = snmp.startup_last_changed
-        time_info = cisco_tics_to_ctime(
-            epoch,
-            uptime,
-            running_changed,
-            running_saved,
-            startup_changed
-        )
-        if (
-            snmp.uptime > saved.uptime or
-            snmp.running_last_changed < saved.running_last_changed
-        ):
-            if snmp.running_last_changed <= config.cfg.reload_max_last_changed:
-                print "Device was reloaded but config was not changed:", dev_name
-            else:
-                print "Device was reloaded and running config changed:", dev_name
-                changed_device_list.append(
-                    {'name': dev_name, 'time_info': time_info}
-                )
-        elif snmp.running_last_changed == saved.running_last_changed:
-            print "Device config not changed:", dev_name
-        elif snmp.running_last_changed > saved.running_last_changed:
-            print "Device config changed:", dev_name        
-            changed_device_list.append(
-                {'name': dev_name, 'time_info': time_info}
+        epoch = snmp['epoch']
+        uptime = snmp['uptime']
+        running_changed = snmp['running_last_changed']
+        running_saved = snmp['running_last_saved']
+        startup_changed = snmp['startup_last_changed']
+
+        # compile previous time info with current time info
+        old_and_new_data = {'old': saved, 'new': snmp}
+        time_info = {}
+        for temporal_state, data in old_and_new_data.iteritems():
+            time_info[temporal_state] = cisco_tics_to_ctime(
+                data['epoch'],
+                data['uptime'],
+                data['running_last_changed'],
+                data['running_last_saved'],
+                data['startup_last_changed'],
             )
+
+        # logic to detect running config changes and reloads
+        change_detected = False
+        reload_detected = False
+        status_msg = ""
+        if (
+            snmp['uptime'] < saved['uptime'] or
+            snmp['running_last_changed'] < saved['running_last_changed']
+        ):
+            reload_detected = True
+            if snmp['running_last_changed'] <= config.cfg.reload_max_last_changed:
+                status_msg = dev_name, "was RELOADED, running config NOT CHANGED."
+                change_detected = False
+            else:
+                status_msg = dev_name, "was RELOADED, running config CHANGED."
+                change_detected = True
+        elif snmp['running_last_changed'] == saved['running_last_changed']:
+            status_msg = dev_name, "running config NOT CHANGED."
+            change_detected = False
+        elif snmp['running_last_changed'] > saved['running_last_changed']:
+            status_msg = dev_name, "running config CHANGED."
+            change_detected = True
         else:
             print "ERROR: What?!?!"
             raise ValueError()
-                
-    # determine changed device data to save in data file(s)
-    write_devices_dict = myDict()
-    for changed_device_dict in changed_devices_list:
-        dev_name = changed_device_dict.name
-        write_devices_dict[dev_name] = snmp_data[dev_name]
 
-    # determine non existent files(s) to save device data
-    for dev_name in list([x for x in snmp_data if x not in saved_devices]):
-        write_devices_dict[dev_name] = snmp_data[dev_name]
+        # device info for report and notifications
+        devices_list.append(
+            {
+                'name': dev_name,
+                'time_info': time_info,
+                'status_msg': status_msg,
+                'change_detected': change_detected,
+                'reload_detected': reload_detected,
+            }
+        )
 
-    # write data if any to file(s)
-    if write_devices_dict != myDict():
-        for file_name in args.data_files:
-            write_data(file_name, write_devices_dict)
-   
-    # notify about devices with changed running configs 
-        
+    # save all device data to file(s)
+    for file_name in args.data_files:
+        write_data(file_name, snmp_data)
+
+    # report on findings
+    # device columns to use in report
+    d_cols = [
+        'name',
+        'change_detected',
+        'reload_detected',
+        'status_msg',
+    ]
+    # time columns in desired order
+    time_columns = [
+        'scan_time',
+        'boot_time',
+        'up_time',
+        'running_changed_time',
+        'running_saved_time',
+        'startup_changed_time',
+    ]
+    # find max widths for formatting
+    # max time column width
+    m_t_c_w = max([len(x) for x in time_columns])
+    # max device column width
+    m_d_c_w = max([len(x) for x in d_cols])
+    # max time value width
+    m_t_v_w = {}
+    for temporal in ['old', 'new']:
+        m_t_v_w[temporal] = get_max_length(
+            [x['time_info'][temporal] for x in devices_list]
+        )
+
+    line_break = "-"*60
+    report_header = []
+    report_content = {
+        'changed': [
+            line_break,
+            'Changed Device List',
+            line_break
+        ],
+        'unchanged': [
+            line_break,
+            'Unchanged Device List',
+            line_break
+        ]
+    }
+    report_time = time.ctime(time.time())
+    device_count = len(devices_list)
+    reload_count = 0
+    change_count = 0
+    for device in devices_list:
+        if device['reload_detected']:
+            reload_count += 1
+        if device['change_detected']:
+            change_count += 1
+            device_state = 'changed'        
+        else:
+            device_state = 'unchanged'        
+      
+        # device info
+        report_content[device_state].append(line_break)
+        for d_col in d_cols:
+            report_content[device_state].append(
+                "{:>{}}: {}".format(
+                    d_col, m_d_c_w,
+                    device[d_col]
+                )
+            ) 
+        report_content[device_state].append(line_break)
+        # time info dict
+        t_i_d = device['time_info']
+        for time_column in time_columns:
+            report_content[device_state].append(
+                "{:>{}}: {:<{}} | {:<{}}".format(
+                    time_column, m_t_c_w,
+                    t_i_d['new'][time_column], m_t_v_w['new'],
+                    t_i_d['old'][time_column], m_t_v_w['old']
+                )
+            )
+        report_content[device_state].append(line_break)
+    report_header.append(line_break)
+    report_header.append(line_break)
+    report_header.append("Cisco Device Configuration Change Detection Report")
+    report_header.append(line_break)
+    report_header.append(line_break)
+    report_header.append("Report Generated: %s" % report_time)
+    report_header.append("Total Device Count: %d" % device_count)
+    report_header.append("Running Configuration Change Device Count: %d" % change_count)
+    report_header.append("Reloaded Device Count: %d" % reload_count)
+    report_header.append(line_break)
+    report_header.append(line_break)
+    report_header.append(line_break)
+
+    for line in report_header:
+        print "{:^100}".format(line)
+    for state in ['changed', 'unchanged']:
+        if state == 'changed' and change_count == 0:
+            continue
+        elif state == 'unchanged' and change_count == len(devices_list):
+            continue
+        for line in report_content[state]:
+            print "{:^100}".format(line)
+                    
+            
+
+    
         
 if __name__ == "__main__":
     args = setup()
     while True:
         main(args)
+        time.sleep(config.cfg.loop_pause_seconds)
     
