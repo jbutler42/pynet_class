@@ -5,6 +5,7 @@ from common.entities import entities
 from common import oids
 from common.util import cisco_tics_to_ctime
 from common.util import get_snmp_data
+from common.util import get_terminal_size
 from common.util import myDict
 from common.util import read_data_file
 from common.util import write_data_file
@@ -115,10 +116,6 @@ def main(args):
     # compare SNMP data with saved data
     devices_list = []
     for dev_name in list([x for x in snmp_data if x in saved_devices]):
-        print (
-            dev_name,
-            time.ctime(time.time())
-        )
         saved = saved_devices[dev_name]
         snmp = snmp_data[dev_name]
         epoch = snmp['epoch']
@@ -208,18 +205,22 @@ def main(args):
             [x['time_info'][temporal] for x in devices_list]
         )
 
-    line_break = "-"*60
+    line_break = "-"*79
     report_header = []
     report_content = {
         'changed': [
+            '\n',
             line_break,
             'Changed Device List',
-            line_break
+            line_break,
+            '\n',
         ],
         'unchanged': [
+            '\n',
             line_break,
             'Unchanged Device List',
-            line_break
+            line_break,
+            '\n',
         ]
     }
     report_time = time.ctime(time.time())
@@ -239,7 +240,7 @@ def main(args):
         report_content[device_state].append(line_break)
         for d_col in d_cols:
             report_content[device_state].append(
-                "{:>{}}: {}".format(
+                "|{:>{}}: {}|".format(
                     d_col, m_d_c_w,
                     device[d_col]
                 )
@@ -249,7 +250,7 @@ def main(args):
         t_i_d = device['time_info']
         for time_column in time_columns:
             report_content[device_state].append(
-                "{:>{}}: {:<{}} | {:<{}}".format(
+                "|{:>{}}: {:<{}} | {:<{}}|".format(
                     time_column, m_t_c_w,
                     t_i_d['new'][time_column], m_t_v_w['new'],
                     t_i_d['old'][time_column], m_t_v_w['old']
@@ -267,17 +268,21 @@ def main(args):
     report_header.append("Reloaded Device Count: %d" % reload_count)
     report_header.append(line_break)
     report_header.append(line_break)
-    report_header.append(line_break)
+
+    try:
+        (width, height) = get_terminal_size()
+    except Exception as e:
+        width = 100
 
     for line in report_header:
-        print "{:^100}".format(line)
+        print "{:^{}}".format(line, width)
     for state in ['changed', 'unchanged']:
         if state == 'changed' and change_count == 0:
             continue
         elif state == 'unchanged' and change_count == len(devices_list):
             continue
         for line in report_content[state]:
-            print "{:^100}".format(line)
+            print "{:^{}}".format(line, width)
                     
             
 
