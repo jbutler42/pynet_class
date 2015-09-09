@@ -4,23 +4,30 @@ import time
 import yaml
 # import cPickle as pickle
 import pickle
-from common.Kirk import email_helper
+# from common.Kirk import email_helper
 from common.Kirk import snmp_helper
+
 
 class myDict(dict):
     def __init__(self, *args, **kwargs):
         super(myDict, self).__init__(*args, **kwargs)
+
     def __getattr__(self, name):
         return self.get(name)
+
     def __setattr__(self, name, value):
         self[name] = value
+
     def __delattr__(self, name):
         if name in self:
             del self[name]
+
     def __getstate__(self):
         return self.__dict__
+
     def __setstate__(self, d):
         self.__dict__.update(d)
+
     def __repr__(self):
         return str(dict(self))
 
@@ -55,16 +62,16 @@ def cisco_tics_to_ctime(epoch, uptime, r_c_tics, r_s_tics, s_c_tics):
     c_r_s_time = time.ctime(epoch - (tus - running_saved_seconds))
     c_s_c_time = time.ctime(epoch - (tus - startup_changed_seconds))
     time_status_dict = {
-        'boot_time': c_boot_time,
-        'up_time': c_uptime,
-        'running_changed_time': c_r_c_time,
-        'running_saved_time': c_r_s_time,
-        'startup_changed_time': c_s_c_time,
-        'scan_time': scan_time,
+        'Boot Time': c_boot_time,
+        'Up Time': c_uptime,
+        'Running Config Changed Time': c_r_c_time,
+        'Running Config Saved Time': c_r_s_time,
+        'Startup Config Changed Time': c_s_c_time,
+        'Scan Time': scan_time,
     }
     return time_status_dict
 
-    
+
 def get_snmp_data(device_tuple, user_tuple, oid_string):
 
     v3get = snmp_helper.snmp_get_oid_v3
@@ -106,7 +113,7 @@ def file_type_from_ext(file_name):
 def write_data_file(file_name, data_dict):
     assert(type(file_name) == type(str()))
     assert(type(data_dict) in [type(dict()), type(myDict())])
-   
+
     data_format = file_type_from_ext(file_name)
     try:
         if data_format == "YAML":
@@ -128,7 +135,7 @@ def write_data_file(file_name, data_dict):
 
 def read_data_file(file_name):
     assert(type(file_name) == type(str()))
-   
+
     data_format = file_type_from_ext(file_name)
     try:
         if data_format == "YAML":
@@ -152,11 +159,16 @@ def read_data_file(file_name):
 
 def get_terminal_size():
     env = os.environ
+
     def ioctl_GWINSZ(fd):
         try:
-            import fcntl, termios, struct
-            cr = struct.unpack('hh', fcntl.ioctl(fd, termios.TIOCGWINSZ,
-        '1234'))
+            import fcntl
+            import termios
+            import struct
+            cr = struct.unpack('hh', fcntl.ioctl(
+                fd,
+                termios.TIOCGWINSZ,
+                '1234'))
         except:
             return
         return cr
@@ -171,9 +183,9 @@ def get_terminal_size():
     if not cr:
         cr = (env.get('LINES', 25), env.get('COLUMNS', 80))
 
-        ### Use get(key[, default]) instead of a try/catch
-        #try:
+        # ## Use get(key[, default]) instead of a try/catch
+        # try:
         #    cr = (env['LINES'], env['COLUMNS'])
-        #except:
+        # except:
         #    cr = (25, 80)
     return int(cr[1]), int(cr[0])
