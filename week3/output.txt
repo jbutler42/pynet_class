@@ -1,0 +1,51 @@
+(applied_python)[jbutler@ip-172-30-0-86 week3]$ python exercise1.py
+
+
+>>> Report Header <<<
++----------------------------------------------------+--------------------------+
+|                    Report Name                     |      Time of Report      |
++----------------------------------------------------+--------------------------+
+| Cisco Device Configuration Change Detection Report | Wed Sep  9 04:05:38 2015 |
++----------------------------------------------------+--------------------------+
+
+
+>>> Report Summary <<<
++--------------------+----------------------------+-----------------------------+------------------------------+
+| Total Device Count | Total Changed Device Count | Total Reloaded Device Count | Total Unchanged Device Count |
++--------------------+----------------------------+-----------------------------+------------------------------+
+|         2          |             1              |              0              |              1               |
++--------------------+----------------------------+-----------------------------+------------------------------+
+
+
+>>> 1 *Changed* Devices <<<
++-------------+-----------------------------+-------------------------------------+----------------------------+
+| Device Name |                   Attribute |                       Current Value |             Previous Value |
++-------------+-----------------------------+-------------------------------------+----------------------------+
+|        rtr2 |             Change Detected |                                 YES |            N/A (not saved) |
+|        rtr2 |             Reload Detected |                                  NO |            N/A (not saved) |
+|        rtr2 |              Status Message | ('rtr2', 'running config CHANGED.') |            N/A (not saved) |
+|        rtr2 |                   Scan Time |            Wed Sep  9 04:05:37 2015 |   Wed Sep  9 03:56:26 2015 |
+|        rtr2 |                     Up Time |          Y:0 W:7 D:4 H:15 M:50 S:25 | Y:0 W:7 D:4 H:15 M:41 S:14 |
+|        rtr2 |                   Boot Time |            Fri Jul 17 12:15:12 2015 |   Fri Jul 17 12:15:12 2015 |
+|        rtr2 | Startup Config Changed Time |            Tue Sep  8 12:05:13 2015 |   Tue Sep  8 12:05:13 2015 |
+|        rtr2 |   Running Config Saved Time |            Wed Sep  9 02:00:43 2015 |   Wed Sep  9 02:00:43 2015 |
+|        rtr2 | Running Config Changed Time |            Wed Sep  9 04:00:18 2015 |   Wed Sep  9 03:45:18 2015 |
++-------------+-----------------------------+-------------------------------------+----------------------------+
+
+
+>>> 1 *UnChanged* Devices <<<
++-------------+-----------------------------+-----------------------------------------+----------------------------+
+| Device Name |                   Attribute |                           Current Value |             Previous Value |
++-------------+-----------------------------+-----------------------------------------+----------------------------+
+|        rtr1 |             Change Detected |                                      NO |            N/A (not saved) |
+|        rtr1 |             Reload Detected |                                      NO |            N/A (not saved) |
+|        rtr1 |              Status Message | ('rtr1', 'running config NOT CHANGED.') |            N/A (not saved) |
+|        rtr1 |                   Scan Time |                Wed Sep  9 04:05:37 2015 |   Wed Sep  9 03:56:26 2015 |
+|        rtr1 |                     Up Time |              Y:0 W:7 D:4 H:15 M:49 S:37 | Y:0 W:7 D:4 H:15 M:40 S:27 |
+|        rtr1 |                   Boot Time |                Fri Jul 17 12:15:59 2015 |   Fri Jul 17 12:15:59 2015 |
+|        rtr1 | Startup Config Changed Time |                Tue Sep  8 12:05:15 2015 |   Tue Sep  8 12:05:15 2015 |
+|        rtr1 |   Running Config Saved Time |                Wed Sep  9 02:00:22 2015 |   Wed Sep  9 02:00:22 2015 |
+|        rtr1 | Running Config Changed Time |                Mon Sep  7 21:57:11 2015 |   Mon Sep  7 21:57:11 2015 |
++-------------+-----------------------------+-----------------------------------------+----------------------------+
+
+

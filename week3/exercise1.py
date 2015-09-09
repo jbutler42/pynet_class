@@ -3,12 +3,12 @@
 from common import config
 from common.entities import entities
 from common import oids
+from common.prettytable import PrettyTable
 from common.util import cisco_tics_to_ctime
 from common.util import get_snmp_data
 from common.util import myDict
 from common.util import read_data_file
 from common.util import write_data_file
-from prettytable import PrettyTable
 import os
 import time
 
@@ -150,24 +150,20 @@ def main(args):
                     'Status Message': status_msg,
                     'Change Detected': change_detected,
                     'Reload Detected': reload_detected,
-                    'old': {
-                        cisco_tics_to_ctime(
-                            saved['epoch'],
-                            saved['uptime'],
-                            saved['running_last_changed'],
-                            saved['running_last_saved'],
-                            saved['startup_last_changed'],
-                        )
-                    },
-                    'new': {
-                        cisco_tics_to_ctime(
-                            snmp['epoch'],
-                            snmp['uptime'],
-                            snmp['running_last_changed'],
-                            snmp['running_last_saved'],
-                            snmp['startup_last_changed'],
-                        )
-                    },
+                    'old': cisco_tics_to_ctime(
+                        saved['epoch'],
+                        saved['uptime'],
+                        saved['running_last_changed'],
+                        saved['running_last_saved'],
+                        saved['startup_last_changed']
+                    ),
+                    'new': cisco_tics_to_ctime(
+                        snmp['epoch'],
+                        snmp['uptime'],
+                        snmp['running_last_changed'],
+                        snmp['running_last_saved'],
+                        snmp['startup_last_changed']
+                    ),
                 },
             },
         )
@@ -182,6 +178,7 @@ def main(args):
     device_count = len(devices_dict)
     reload_count = 0
     change_count = 0
+    unchange_count = 0
     tables = {}
     data_rows = {}
     tables['header_table'] = PrettyTable(
@@ -190,12 +187,13 @@ def main(args):
             'Time of Report'
         ]
     )
-    tables['header_table'].add_column([report_name, report_time])
+    tables['header_table'].add_row([report_name, report_time])
     tables['summary_table'] = PrettyTable(
         [
             'Total Device Count',
             'Total Changed Device Count',
             'Total Reloaded Device Count',
+            'Total Unchanged Device Count',
         ]
     )
     data_table_cols = [
@@ -207,6 +205,7 @@ def main(args):
     states = ['changed', 'unchanged']
     for state in states:
         tables[state] = PrettyTable(data_table_cols)
+        tables[state].align = 'r'
         data_rows[state] = []
     yes = 'YES'
     no = 'NO'
@@ -239,25 +238,32 @@ def main(args):
             cd = yes
             rd = no
             state = 'changed'
-        data_rows[state].append(
+        else:
+            cd = no
+            rd = no
+            state = 'unchanged'
+
+        data_rows[state].extend(
             [
-                dev_name,
-                'Change Detected',
-                cd,
-                na
-            ],
-            [
-                dev_name,
-                'Reload Detected',
-                rd,
-                na
-            ],
-            [
-                dev_name,
-                'Status Message',
-                dev['Status Message'],
-                na
-            ],
+                [
+                    dev_name,
+                    'Change Detected',
+                    cd,
+                    na
+                ],
+                [
+                    dev_name,
+                    'Reload Detected',
+                    rd,
+                    na
+                ],
+                [
+                    dev_name,
+                    'Status Message',
+                    dev['Status Message'],
+                    na
+                ],
+            ]
         )
         for time_col in time_cols:
             data_rows[state].append(
@@ -268,21 +274,36 @@ def main(args):
                     dev_old[time_col]
                 ],
             )
-
-    tables['summary_table'].add_column(
+    unchange_count = device_count - change_count
+    tables['summary_table'].add_row(
         [
             device_count,
             change_count,
-            reload_count
+            reload_count,
+            unchange_count,
         ]
     )
     for state in states:
         for data_row in data_rows[state]:
-            tables[state].add_column(data_row)
+            tables[state].add_row(data_row)
 
-    ordered_tables = ['header_table', 'summary_table', 'changed', 'unchanged']
-    for table in ordered_tables:
-        print tables[table]
+    ordered_tables = [
+        ('header_table', '>>> Report Header <<<'),
+        ('summary_table', '>>> Report Summary <<<'),
+        ('changed', '>>> %d *Changed* Devices <<<' % change_count),
+        ('unchanged', '>>> %d *UnChanged* Devices <<<' % unchange_count),
+    ]
+    for table_tuple in ordered_tables:
+        table = table_tuple[0]
+        msg = table_tuple[1]
+        if table == 'changed' and change_count == 0:
+            continue
+        elif table == 'unchanged' and unchange_count == 0:
+            continue
+        else:
+            print msg
+            print tables[table]
+            print "\n"
 
 if __name__ == "__main__":
     args = setup()
