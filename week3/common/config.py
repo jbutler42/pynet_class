@@ -19,7 +19,7 @@ class configObject(object):
             'email_enabled': self.cfg.getboolean('Email', 'email_enabled'),
             'email_from': self.cfg.get('Email', 'from'),
             'email_to': self.cfg.get('Email', 'to'),
-        } 
+        }
 
 
 cfg = configObject()
