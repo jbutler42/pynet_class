@@ -4,7 +4,7 @@ import time
 import yaml
 # import cPickle as pickle
 import pickle
-# from common.Kirk import email_helper
+from common.Kirk import email_helper
 from common.Kirk import snmp_helper
 
 
@@ -108,6 +108,14 @@ def file_type_from_ext(file_name):
     else:
         data_format = "PICKLE"
     return data_format
+
+
+def send_email(sender, recipient, subject, message):
+    try:
+        email_helper.send_mail(recipient, subject, message, sender)
+    except Exception as e:
+        return False
+    return True
 
 
 def write_data_file(file_name, data_dict):

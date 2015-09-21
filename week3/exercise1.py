@@ -5,6 +5,7 @@ from common.entities import entities
 from common import oids
 from common.prettytable import PrettyTable
 from common.util import cisco_tics_to_ctime
+from common.util import send_email
 from common.util import get_snmp_data
 from common.util import myDict
 from common.util import read_data_file
@@ -293,6 +294,7 @@ def main(args):
         ('changed', '>>> %d *Changed* Devices <<<' % change_count),
         ('unchanged', '>>> %d *UnChanged* Devices <<<' % unchange_count),
     ]
+    output = ""
     for table_tuple in ordered_tables:
         table = table_tuple[0]
         msg = table_tuple[1]
@@ -301,10 +303,18 @@ def main(args):
         elif table == 'unchanged' and unchange_count == 0:
             continue
         else:
-            print msg
-            print tables[table]
-            print "\n"
+            output = output + msg + str(tables[table]) + '\n'
 
+    # print to screen
+    print output
+    # send email if email_enable == True
+    if cfg.email.get('email_enabled'):
+        m_from = config.cfg.email.get('from')
+        m_to = config.cfg.email.get('to')
+        subject = "Detected Device Config Change"
+        send_mail(m_from, m_to, subject, output)
+
+    
 if __name__ == "__main__":
     args = setup()
     while True:
