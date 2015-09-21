@@ -16,9 +16,9 @@ class configObject(object):
         self.reload_max_last_changed = float(self.cfg.get('Device Settings', 'reload_max_last_changed'))
         self.loop_pause_seconds = float(self.cfg.get('Runtime Options', 'loop_pause_seconds'))
         self.email = {
-            'email_enabled': self.cfg.getbool('Email', 'email_enabled')),
-            'email_from': self.cfg.get('Email', 'from')),
-            'email_to': self.cfg.get('Email', 'to')),
+            'email_enabled': self.cfg.getboolean('Email', 'email_enabled'),
+            'email_from': self.cfg.get('Email', 'from'),
+            'email_to': self.cfg.get('Email', 'to'),
         } 
 
 

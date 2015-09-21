@@ -76,15 +76,14 @@ def setup():
     return setup_args
 
 
-def main(args):
-
+def get_device_data(data_files):
     # Load saved device data if any, from all indicated data files.
     # There are multiple data files just to illustrate the use of
     # various data formats (JSON, YAML, PICKLE).
     # Make sure the data structure is the same in each data file.
     saved_data = myDict()
     saved_devices = myDict()
-    for file_name in args.data_files:
+    for file_name in data_files:
         saved_data[file_name] = get_file_data(file_name)
     if is_equal_dicts(saved_data):
         if saved_data[file_name] is not None:
@@ -92,22 +91,28 @@ def main(args):
     else:
         print (
             "ERROR: Data in data files differs! Deleting data files.",
-            args.data_files
+            data_files
         )
-        for file_name in args.data_files:
+        for file_name in data_files:
             if os.path.exists(file_name):
                 os.remove(file_name)
         raise BaseException
+    return saved_data, saved_devices
 
+
+def get_device_snmp_data(devices, user_tuple, oids_dict):
     # get snmp data from each device for each oid
     snmp_data = myDict()
-    for dev_name, device_tuple in args.devices.iteritems():
+    for dev_name, device_tuple in devices.iteritems():
         snmp_data[dev_name] = my_get_snmp_data(
             device_tuple,
-            args.user_tuple,
-            args.oids_dict
+            user_tuple,
+            oids_dict
         )
+    return snmp_data
 
+
+def compare_snmp_saved(snmp_data, saved_devices):
     # compare SNMP data with saved data
     devices_dict = {}
     for dev_name in list([x for x in snmp_data if x in saved_devices]):
@@ -168,18 +173,19 @@ def main(args):
                 },
             },
         )
+    return devices_dict
 
+
+def save_device_data(data_files, snmp_data):
     # save all device data to file(s)
-    for file_name in args.data_files:
+    for file_name in data_files:
         write_data(file_name, snmp_data)
 
+
+def setup_tables(devices_dict):
     # report on detected device info
     report_name = "Cisco Device Configuration Change Detection Report"
     report_time = time.ctime(time.time())
-    device_count = len(devices_dict)
-    reload_count = 0
-    change_count = 0
-    unchange_count = 0
     tables = {}
     data_rows = {}
     tables['header_table'] = PrettyTable(
@@ -208,9 +214,6 @@ def main(args):
         tables[state] = PrettyTable(data_table_cols)
         tables[state].align = 'r'
         data_rows[state] = []
-    yes = 'YES'
-    no = 'NO'
-    na = 'N/A (not saved)'
     time_cols = [
         'Scan Time',
         'Up Time',
@@ -219,6 +222,24 @@ def main(args):
         'Running Config Saved Time',
         'Running Config Changed Time'
     ]
+    tables_dict = {
+        'tables': tables,
+        'data_rows': data_rows,
+        'data_table_cols': data_table_cols,
+        'states': states,
+        'time_cols': time_cols,
+    }
+    return tables_dict
+    
+
+def compile_tables_data(devices_dict, tables_dict):
+    device_count = len(devices_dict)
+    reload_count = 0
+    change_count = 0
+    unchange_count = 0
+    yes = 'YES'
+    no = 'NO'
+    na = 'N/A (not saved)'
     for dev_name in devices_dict.iterkeys():
         dev = devices_dict[dev_name]
         dev_old = dev['old']
@@ -244,7 +265,7 @@ def main(args):
             rd = no
             state = 'unchanged'
 
-        data_rows[state].extend(
+        tables_dict['data_rows'][state].extend(
             [
                 [
                     dev_name,
@@ -266,8 +287,8 @@ def main(args):
                 ],
             ]
         )
-        for time_col in time_cols:
-            data_rows[state].append(
+        for time_col in tables_dict['time_cols']:
+            tables_dict['data_rows'][state].append(
                 [
                     dev_name,
                     time_col,
@@ -276,7 +297,7 @@ def main(args):
                 ],
             )
     unchange_count = device_count - change_count
-    tables['summary_table'].add_row(
+    tables_dict['tables']['summary_table'].add_row(
         [
             device_count,
             change_count,
@@ -284,35 +305,78 @@ def main(args):
             unchange_count,
         ]
     )
-    for state in states:
-        for data_row in data_rows[state]:
-            tables[state].add_row(data_row)
+    for state in tables_dict['states']:
+        for data_row in tables_dict['data_rows'][state]:
+            tables_dict['tables'][state].add_row(data_row)
 
+    counts_dict = {
+        'change_count': change_count,
+        'unchange_count': unchange_count,
+        'device_count': device_count,
+        'reload_count': reload_count,
+    }
+
+    return tables_dict, counts_dict
+
+
+def make_output(tables_dict, counts_dict): 
     ordered_tables = [
         ('header_table', '>>> Report Header <<<'),
         ('summary_table', '>>> Report Summary <<<'),
-        ('changed', '>>> %d *Changed* Devices <<<' % change_count),
-        ('unchanged', '>>> %d *UnChanged* Devices <<<' % unchange_count),
+        ('changed', '>>> %d *Changed* Devices <<<' % (
+            counts_dict['change_count']
+        )),
+        ('unchanged', '>>> %d *UnChanged* Devices <<<' % (
+            counts_dict['unchange_count']
+        )),
     ]
     output = ""
     for table_tuple in ordered_tables:
         table = table_tuple[0]
         msg = table_tuple[1]
-        if table == 'changed' and change_count == 0:
+        if table == 'changed' and counts_dict['change_count'] == 0:
             continue
-        elif table == 'unchanged' and unchange_count == 0:
+        elif table == 'unchanged' and counts_dict['unchange_count'] == 0:
             continue
         else:
-            output = output + msg + str(tables[table]) + '\n'
+            output = output + msg + '\n' + str(tables_dict['tables'][table]) + '\n'
+    return output
 
-    # print to screen
-    print output
-    # send email if email_enable == True
-    if cfg.email.get('email_enabled'):
+
+def email_output(output):
         m_from = config.cfg.email.get('from')
         m_to = config.cfg.email.get('to')
         subject = "Detected Device Config Change"
         send_mail(m_from, m_to, subject, output)
+        return True
+
+
+def main(args):
+
+    saved_data, saved_devices = get_device_data(
+        args.data_files,
+    )
+    snmp_data = get_device_snmp_data(
+        args.devices,
+        args.user_tuple,
+        args.oids_dict
+    )
+    devices_dict = compare_snmp_saved(
+        snmp_data,
+        saved_devices
+    )
+    save_device_data(args.data_files, snmp_data)
+    tables_dict = setup_tables(devices_dict)
+    tables_dict, counts_dict = compile_tables_data(devices_dict, tables_dict)
+    output = make_output(tables_dict, counts_dict)
+
+
+    # print to screen
+    print output
+
+    # send email if there was a change and email_enable == True
+    if config.cfg.email.get('email_enabled') and counts_dict['change_count'] > 0:
+        email_output(output)
 
     
 if __name__ == "__main__":
