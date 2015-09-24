@@ -54,7 +54,7 @@ class graphInterfaces(object):
 
     def __init__(self, **kwargs):
         self.last = 555559
-        self.test = True
+        self.test = False
         self.devices = entities.devices
         self.user_tuple = entities.users.user1
         self.oid_groups = kwargs.get(
@@ -205,6 +205,7 @@ class graphInterfaces(object):
             if self.test:
                 pass
             else:
+                print "INFO: Got datapoint:", point
                 sleep(self.step * 60)
 
     def get_graphs(self):
