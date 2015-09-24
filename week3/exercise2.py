@@ -1,11 +1,11 @@
 from common import config
 from common.entities import entities
 from common import oids
-from common.util import send_email
 from common.util import get_snmp_data
 from pygal import Line
 from random import randint
 from time import sleep
+
 
 class snmpDataMetric(object):
     def __init__(self, dev_name, metric, snmp_index):
@@ -16,17 +16,17 @@ class snmpDataMetric(object):
 
     def reset_values(self):
         self.values = {}
-    
+
     def set_value(self, data_point, value):
         self.values.update({data_point: value})
-    
+
     def get_values(self):
         return self.values
 
     def get_value_by_data_point(self, data_point):
         return self.values.get('data_point', 'NaN')
 
-    def compute_values(self):
+    def get_computed_values(self):
         values = self.get_values()
         data_points = values.keys()
         data_points.sort()
@@ -39,7 +39,8 @@ class snmpDataMetric(object):
             else:
                 computed_value = current_value - previous_value
             previous_value = current_value
-            
+            computed_values.append(computed_value)
+        return computed_values
 
     def __repr__(self):
         return "<snmpDataMetric(%s, %s, %s)>" % (
@@ -47,8 +48,8 @@ class snmpDataMetric(object):
             self.metric,
             self.snmp_index,
         )
-         
-        
+
+
 class graphInterfaces(object):
 
     def __init__(self, **kwargs):
@@ -56,7 +57,8 @@ class graphInterfaces(object):
         self.test = True
         self.devices = entities.devices
         self.user_tuple = entities.users.user1
-        self.oid_groups = kwargs.get('oid_groups',
+        self.oid_groups = kwargs.get(
+            'oid_groups',
             {
                 'Unicast Packets':
                     ('ifInUcastPkts', 'ifOutUcastPkts'),
@@ -87,23 +89,31 @@ class graphInterfaces(object):
             config.cfg.cfg.get(
                 'Line Graphs',
                 'units'
-        ))
+            )
+        )
         self.points = range(self.start, self.stop + 1, self.step)
 
     def _oids_in_groups(self):
         oids_in_groups = []
-        for group_name, oids in self.oid_groups.iteritems():
-            oids_in_groups.extend(oids)
+        for group_name, oid_names in self.oid_groups.iteritems():
+            oids_in_groups.extend(oid_names)
         return oids_in_groups
-            
+
     def init_metrics(self):
-        self.metrics = []
-        oid_descs = self._oids_in_groups()    
+        self.metrics = {}
+        oid_descs = self._oids_in_groups()
         for oid_desc in oid_descs:
             for dev_name, snmp_indexes in self.device_dict.iteritems():
                 for snmp_index in snmp_indexes:
-                    self.metrics.append(snmpDataMetric(dev_name, oid_desc, snmp_index))
-        print self.metrics
+                    self.metrics[(
+                        dev_name,
+                        oid_desc,
+                        snmp_index
+                    )] = snmpDataMetric(
+                        dev_name,
+                        oid_desc,
+                        snmp_index
+                    )
 
     def my_oids(self):
         oids_dict = {}
@@ -115,10 +125,10 @@ class graphInterfaces(object):
         for oid in oids_desc:
             oids_dict.update({oid: oids.get(oid)})
         return oids_dict
-    
+
     def get_line_chart(self, title, lines):
         """Make chart of type line and return it.
-        
+
         title: Title of chart (string)
         step: x label step and poll interval (integer)
         start: x label start value (integer)
@@ -126,10 +136,10 @@ class graphInterfaces(object):
         lines: tuple or list of tuples or lists (line_name, data_points)
             line_name (string)
             data_points (list of ints)
-    
+
         returns line_chart (pygal.Line())
         """
-    
+
         chart = Line()
         chart.title = title
         chart.x_labels = self.points
@@ -140,8 +150,8 @@ class graphInterfaces(object):
             data = line[1]
             chart.add(label, data)
         return chart
-   
-    @staticmethod 
+
+    @staticmethod
     def save_chart(file_name, chart):
         try:
             chart.render_to_file(file_name)
@@ -156,7 +166,6 @@ class graphInterfaces(object):
             snmp_data = self.last
             return snmp_data
         oid_string = '.'.join([oid_string, str(index)])
-        print "DEBUG: oid_string:", oid_string
         snmp_data = get_snmp_data(
             tuple(device_tuple),
             tuple(self.user_tuple),
@@ -166,17 +175,13 @@ class graphInterfaces(object):
 
     def devices_indexes(self):
         for dev_name, snmp_indexes in self.device_dict.iteritems():
-            device_tuple = self.devices.get(dev_name)
             for snmp_index in snmp_indexes:
                 yield dev_name, snmp_index
 
     def poll_oids(self, device_tuple, snmp_index):
         data = {}
         for oid_name in self._oids_in_groups():
-            print "DEBUG: oid_name:", oid_name
             oid_string = self.oids_dict.get(oid_name)
-            print "DEBUG: oid_string:", oid_string
-            print "DEBUG: snmp_index:", snmp_index
             data[oid_name] = self.get_snmp(
                 device_tuple,
                 oid_string,
@@ -184,33 +189,70 @@ class graphInterfaces(object):
             )
         return data
 
-    def get_data_stream(self, dev_name, metric, snmp_index):
-        for data_stream in self.metrics:
-            if (
-                data_stream.dev_name,
-                data_stream.metric,
-                data_stream.snmp_index
-            ) == (dev_name, metric, snmp_index):
-                return data_stream
-        return None
-
-    def run(self):
+    def get_data_points(self):
         for point in self.points:
             devices_indexes = self.devices_indexes()
             for dev_name, snmp_index in devices_indexes:
                 device_tuple = self.devices.get(dev_name)
                 data = self.poll_oids(device_tuple, snmp_index)
                 for metric, value in data.iteritems():
-                    data_stream = self.get_data_stream(
+                    data_stream = self.metrics[(
                         dev_name,
                         metric,
                         snmp_index
-                    )
+                    )]
                     data_stream.set_value(point, value)
-            for metric in self.metrics:
-                print metric, metric.get_values()
-            sleep(int(self.step) * 1)
+            if self.test:
+                pass
+            else:
+                sleep(self.step * 60)
+
+    def get_graphs(self):
+        graphs = []
+        devices_indexes = self.devices_indexes()
+        for dev_name, snmp_index in devices_indexes:
+            for oid_group_name, oid_names in self.oid_groups.iteritems():
+                graph = {}
+                graph['file_name'] = '%s_%s_%s.svg' % (
+                    dev_name,
+                    oid_group_name,
+                    str(snmp_index)
+                )
+                graph['title'] = graph['file_name']
+                graph['lines'] = []
+                for oid_name in oid_names:
+                    graph['lines'].append(
+                        (
+                            oid_name,
+                            self.metrics[(
+                                dev_name,
+                                oid_name,
+                                snmp_index
+                            )].get_computed_values()
+                        )
+                    )
+                graph['graph'] = self.get_line_chart(
+                    graph['title'],
+                    graph['lines']
+                )
+                graphs.append(graph)
+        return graphs
+
+    def run(self):
+        graph_folder = config.cfg.cfg.get('Files', 'graphs_file_folder')
+        self.get_data_points()
+        graphs = self.get_graphs()
+        for graph in graphs:
+            path = '/'.join([graph_folder, graph['file_name']])
+            self.save_chart(path, graph['graph'])
+        return graphs
 
 
 def test():
-    return graphInterfaces()
+    g = graphInterfaces()
+    graphs = g.run()
+    return g, graphs
+
+
+if __name__ == '__main__':
+    test()
