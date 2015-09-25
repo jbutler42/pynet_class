@@ -24,7 +24,7 @@ class snmpDataMetric(object):
         return self.values
 
     def get_value_by_data_point(self, data_point):
-        return self.values.get('data_point', 'NaN')
+        return self.values.get(data_point)
 
     def get_computed_values(self):
         values = self.get_values()
@@ -34,6 +34,8 @@ class snmpDataMetric(object):
         computed_values = []
         for data_point in data_points:
             current_value = values.get(data_point)
+            if type(current_value) != type(int()):
+                current_value = previous_value 
             if previous_value == 0:
                 computed_value = 0
             else:
@@ -180,13 +182,33 @@ class graphInterfaces(object):
 
     def poll_oids(self, device_tuple, snmp_index):
         data = {}
-        for oid_name in self._oids_in_groups():
-            oid_string = self.oids_dict.get(oid_name)
-            data[oid_name] = self.get_snmp(
+        retries = 3
+        pause = 1
+
+        def poll_oid(device_tuple, oid_string, snmp_index):
+            data = self.get_snmp(
                 device_tuple,
                 oid_string,
                 snmp_index
             )
+            return data
+
+        for oid_name in self._oids_in_groups():
+            oid_string = self.oids_dict.get(oid_name)
+            good_data = False
+            attempt = 0
+            while not good_data and attempt != retries:
+                attempt += 1
+                data[oid_name] = poll_oid(device_tuple, oid_string, snmp_index)
+                try:
+                    data[oid_name] = int(data[oid_name])
+                except Exception as e:
+                    good_data = False
+                    if attempt != retries:
+                        sleep(pause)
+                    data[oid_name] = 0
+                else:
+                    good_data = True
         return data
 
     def get_data_points(self):

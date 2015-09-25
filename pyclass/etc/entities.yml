@@ -1,0 +1,24 @@
+device_ips: &device_ip_list
+    ip1: &ip1 50.76.53.27
+
+tcp_ports: &tcp_port_list
+    port1: &port1 7961
+    port2: &port2 8061
+
+devices: &device_list
+    rtr1: &rtr1 [*ip1, *port1]
+    rtr2: &rtr2 [*ip1, *port2]
+    
+snmpv3_users: &user_list
+    user1: &user1 [pysnmp, galileo1, galileo1]
+
+ssh_user: pyclass
+ssh_pass: 88newclass
+
+ssh_tcp_ports: &ssh_tcp_port_list
+    port1: &ssh_port1 22
+    port2: &ssh_port2 8022
+
+ssh_devices: &ssh_device_list
+    rtr1: &ssh_rtr1 [*ip1, *ssh_port1, 'ios']
+    rtr2: &ssh_rtr2 [*ip1, *ssh_port2, 'ios']

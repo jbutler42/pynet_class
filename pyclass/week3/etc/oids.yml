@@ -1,0 +1,17 @@
+sysName: 1.3.6.1.2.1.1.5.0
+sysUptime: 1.3.6.1.2.1.1.3.0
+ifDescr: 1.3.6.1.2.1.2.2.1.2
+ifAlias: 1.3.6.1.2.1.31.1.1.1.18
+ifInOctets: 1.3.6.1.2.1.2.2.1.10
+ifInUcastPkts: 1.3.6.1.2.1.2.2.1.11
+ifOutOctets: 1.3.6.1.2.1.2.2.1.16
+ifOutUcastPkts: 1.3.6.1.2.1.2.2.1.17
+
+# Uptime when running config last changed
+ccmHistoryRunningLastChanged: 1.3.6.1.4.1.9.9.43.1.1.1.0
+
+# Uptime when running config last saved (note any 'write' constitutes a save)    
+ccmHistoryRunningLastSaved: 1.3.6.1.4.1.9.9.43.1.1.2.0
+
+# Uptime when startup config last saved   
+ccmHistoryStartupLastChanged: 1.3.6.1.4.1.9.9.43.1.1.3.0
