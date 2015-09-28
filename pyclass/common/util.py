@@ -1,3 +1,4 @@
+from inspect import stack
 import json
 import os
 import time
@@ -113,7 +114,7 @@ def file_type_from_ext(file_name):
 def send_email(sender, recipient, subject, message):
     try:
         email_helper.send_mail(recipient, subject, message, sender)
-    except Exception as e:
+    except Exception:
         return False
     return True
 
@@ -163,3 +164,42 @@ def read_data_file(file_name):
     else:
         fp.close()
         return data
+
+
+def parseargs(args_dict_list):
+    def wrap(f):
+        def wrapped_f(*args, **kwargs):
+            defaulted = {}
+            opts = {}
+            args_list = list(args)
+            for opt in args_dict_list:
+                opt_name, opt_default = opt.items()[0]
+                if args_list:
+                    opts[opt_name] = args_list.pop(0)
+                elif opt_name in kwargs:
+                    opts[opt_name] = kwargs.pop(opt_name)
+                else:
+                    opts[opt_name] = opt_default
+                    defaulted[opt_name] = opt_default
+            invocation = stack()[1][4][0].rstrip()
+            call_status = ["Info: Invocation: {}".format(invocation)]
+            if kwargs:
+                call_status.append(
+                    "Warning: Got unexpected kwargs: {}".format(kwargs)
+                )
+            if defaulted:
+                call_status.append(
+                    "Info: Used default values for args: {}".format(defaulted)
+                )
+            if args_list:
+                call_status.append(
+                    "Warning: Got unexpected positional args: {}".format(
+                        args_list
+                    )
+                )
+            if len(call_status) > 1:
+                for status in call_status:
+                    print status
+            f(*args, **opts)
+        return wrapped_f
+    return wrap
